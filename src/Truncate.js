@@ -5,7 +5,7 @@ export default class Truncate extends Component {
     static propTypes = {
         children: PropTypes.node,
         ellipsis: PropTypes.node,
-        lines: PropTypes.oneOfType([
+        numChars: PropTypes.oneOfType([
             PropTypes.oneOf([false]),
             PropTypes.number
         ]),
@@ -15,7 +15,7 @@ export default class Truncate extends Component {
     static defaultProps = {
         children: '',
         ellipsis: '…',
-        lines: 1
+        numChars: 50
     };
 
     state = {};
@@ -24,39 +24,7 @@ export default class Truncate extends Component {
         super(...args);
 
         this.elements = {};
-
-        this.onResize = this.onResize.bind(this);
         this.onTruncate = this.onTruncate.bind(this);
-        this.calcTargetWidth = this.calcTargetWidth.bind(this);
-        this.measureWidth = this.measureWidth.bind(this);
-        this.getLines = this.getLines.bind(this);
-        this.renderLine = this.renderLine.bind(this);
-    }
-
-    componentDidMount() {
-        const {
-            elements: {
-                text,
-                ellipsis
-            },
-            calcTargetWidth,
-            onResize
-        } = this;
-
-        const canvas = document.createElement('canvas');
-        this.canvasContext = canvas.getContext('2d');
-
-        // Keep node in document body to read .offsetWidth
-        document.body.appendChild(ellipsis);
-
-        calcTargetWidth(() => {
-            // Node not needed in document tree to read its content
-            if (text) {
-                text.parentNode.removeChild(text);
-            }
-        });
-
-        window.addEventListener('resize', onResize);
     }
 
     componentDidUpdate(prevProps) {
@@ -71,14 +39,10 @@ export default class Truncate extends Component {
             elements: {
                 ellipsis
             },
-            onResize,
             timeout
-        } = this;
+        } = this
 
         ellipsis.parentNode.removeChild(ellipsis);
-
-        window.removeEventListener('resize', onResize);
-
         window.cancelAnimationFrame(timeout);
     }
 
@@ -102,10 +66,6 @@ export default class Truncate extends Component {
         return text;
     }
 
-    onResize() {
-        this.calcTargetWidth();
-    }
-
     onTruncate(didTruncate) {
         const {
             onTruncate
@@ -118,172 +78,6 @@ export default class Truncate extends Component {
         }
     }
 
-    calcTargetWidth(callback) {
-        const {
-            elements: {
-                target
-            },
-            calcTargetWidth,
-            canvasContext
-        } = this;
-
-        // Calculation is no longer relevant, since node has been removed
-        if (!target) {
-            return;
-        }
-
-        // Floor the result to deal with browser subpixel precision
-        const targetWidth = Math.floor(
-            target.parentNode.getBoundingClientRect().width
-        );
-
-        // Delay calculation until parent node is inserted to the document
-        // Mounting order in React is ChildComponent, ParentComponent
-        if (!targetWidth) {
-            return window.requestAnimationFrame(() => calcTargetWidth(callback));
-        }
-
-        const style = window.getComputedStyle(target);
-
-        const font = [
-            style['font-weight'],
-            style['font-style'],
-            style['font-size'],
-            style['font-family']
-        ].join(' ');
-
-        canvasContext.font = font;
-
-        this.setState({
-            targetWidth
-        }, callback);
-    }
-
-    measureWidth(text) {
-        return this.canvasContext.measureText(text).width;
-    }
-
-    ellipsisWidth(node) {
-        return node.offsetWidth;
-    }
-
-    getLines() {
-        const {
-            elements,
-            props: {
-                lines: numLines,
-                ellipsis
-            },
-            state: {
-                targetWidth
-            },
-            innerText,
-            measureWidth,
-            onTruncate
-        } = this;
-
-        const lines = [];
-        const text = innerText(elements.text);
-        const textLines = text.split('\n').map(line => line.split(' '));
-        let didTruncate = true;
-        const ellipsisWidth = this.ellipsisWidth(this.elements.ellipsis);
-
-        for (let line = 1; line <= numLines; line++) {
-            const textWords = textLines[0];
-
-            // Handle newline
-            if (textWords.length === 0) {
-                lines.push();
-                textLines.shift();
-                line--;
-                continue;
-            }
-
-            let resultLine = textWords.join(' ');
-
-            if (measureWidth(resultLine) <= targetWidth) {
-                if (textLines.length === 1) {
-                    // Line is end of text and fits without truncating
-                    didTruncate = false;
-
-                    lines.push(resultLine);
-                    break;
-                }
-            }
-
-            if (line === numLines) {
-                // Binary search determining the longest possible line inluding truncate string
-                const textRest = textWords.join(' ');
-
-                let lower = 0;
-                let upper = textRest.length - 1;
-
-                while (lower <= upper) {
-                    const middle = Math.floor((lower + upper) / 2);
-
-                    const testLine = textRest.slice(0, middle + 1);
-
-                    if (measureWidth(testLine) + ellipsisWidth <= targetWidth) {
-                        lower = middle + 1;
-                    } else {
-                        upper = middle - 1;
-                    }
-                }
-
-                resultLine = <span>{textRest.slice(0, lower)}{ellipsis}</span>;
-            } else {
-                // Binary search determining when the line breaks
-                let lower = 0;
-                let upper = textWords.length - 1;
-
-                while (lower <= upper) {
-                    const middle = Math.floor((lower + upper) / 2);
-
-                    const testLine = textWords.slice(0, middle + 1).join(' ');
-
-                    if (measureWidth(testLine) <= targetWidth) {
-                        lower = middle + 1;
-                    } else {
-                        upper = middle - 1;
-                    }
-                }
-
-                // The first word of this line is too long to fit it
-                if (lower === 0) {
-                    // Jump to processing of last line
-                    line = numLines - 1;
-                    continue;
-                }
-
-                resultLine = textWords.slice(0, lower).join(' ');
-                textLines[0].splice(0, lower);
-            }
-
-            lines.push(resultLine);
-        }
-
-        onTruncate(didTruncate);
-
-        return lines;
-    }
-
-    renderLine(line, i, arr) {
-        if (i === arr.length - 1) {
-            return <span key={i}>{line}</span>;
-        } else {
-            const br = <br key={i + 'br'} />;
-
-            if (line) {
-                return [
-                    <span key={i}>{line}</span>,
-                    br
-                ];
-            } else {
-                return br;
-            }
-        }
-    }
-
     render() {
         const {
             elements: {
@@ -292,27 +86,22 @@ export default class Truncate extends Component {
             props: {
                 children,
                 ellipsis,
-                lines,
+                numChars,
                 ...spanProps
             },
-            state: {
-                targetWidth
-            },
-            getLines,
-            renderLine,
             onTruncate
         } = this;
 
         let text;
 
-        const mounted = !!(target && targetWidth);
+        const mounted = !!target;
 
         if (typeof window !== 'undefined' && mounted) {
             if (lines > 0) {
-                text = getLines().map(renderLine);
+                text = <p className="truncated-text">{text.substring(0, numChars)}</p>
+                onTruncate(true);
             } else {
                 text = children;
-
                 onTruncate(false);
             }
         }
