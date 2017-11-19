@@ -98,8 +98,11 @@ export default class Truncate extends Component {
 
         if (typeof window !== 'undefined' && mounted) {
             if (numChars > 0) {
-                const truncatedText = innerText(this.elements.text).substring(0, numChars)
-                text = <p className="truncated-text">{truncatedText}</p>
+                const truncatedText = innerText(children).substring(0, numChars)
+                text = (
+                  <p className="truncated-text">{truncatedText}</p>
+                  {ellipsis}
+                )
                 onTruncate(true);
             } else {
                 text = children;
@@ -111,21 +114,8 @@ export default class Truncate extends Component {
 
         return (
             <span {...spanProps} ref={(targetEl) => { this.elements.target = targetEl; }}>
-                <span>{text}</span>
-                <span ref={(textEl) => { this.elements.text = textEl; }}>{children}</span>
-                <span ref={(ellipsisEl) => { this.elements.ellipsis = ellipsisEl; }} style={this.styles.ellipsis}>
-                    {ellipsis}
-                </span>
+                {text}
             </span>
         );
     }
-
-    styles = {
-        ellipsis: {
-            position: 'fixed',
-            visibility: 'hidden',
-            top: 0,
-            left: 0
-        }
-    };
 };
