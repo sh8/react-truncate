@@ -1,6 +1,6 @@
 {
   "name": "react-truncate",
-  "version": "2.2.2",
+  "version": "2.2.3",
   "description": "React component for truncating multi-line spans and adding an ellipsis",
   "main": "lib/Truncate.CommonJS.js",
   "module": "lib/Truncate.js",
@@ -19,7 +19,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "git@github.com:One-com/react-truncate.git"
+    "url": "git@github.com:sh8/react-truncate.git"
   },
   "homepage": "https://github.com/One-com/react-truncate",
   "keywords": [
